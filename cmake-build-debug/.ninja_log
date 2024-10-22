@@ -1,0 +1,8 @@
+# ninja log v6
+2	308	7513172820168297	CMakeFiles/tetris.dir/main.c.obj	b0ec3b2cace4bd66
+308	465	7513172823230255	tetris.exe	6b0de8df737231f0
+1	217	7513192966238276	build.ninja	e9d8dbb5532c37a2
+2	139	7511121102371280	CMakeFiles/tetris.dir/queue.c.obj	3e7a8e2fd31dd47c
+2	176	7511153779553643	CMakeFiles/tetris.dir/helpers.c.obj	5c3bfdc8c7547832
+13	193	7511126950125939	CMakeFiles/tetris.dir/time.c.obj	68f56c3906c31adb
+2	144	7511388077201111	CMakeFiles/tetris.dir/shape.c.obj	d6c8a78d045e0144
