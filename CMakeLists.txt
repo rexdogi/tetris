@@ -7,6 +7,7 @@ FILE(GLOB MyCSources *.c)
 add_executable(tetris ${MyCSources}
         shape.c
         shape.h
-        array.c)
+        array.c
+        helpers.h)
 
 target_link_libraries(tetris -lOpenGL32 -lfreeGLUT -static -static-libgcc)

@@ -9,6 +9,7 @@
 #include "time.h"
 #include "shape.h"
 #include "array.h"
+#include "helpers.h"
 
 
 #define MS_PER_FRAME 16  // 16 milliseconds per frame for ~60 FPS
@@ -36,9 +37,11 @@ typedef struct
     bool gameover;
     int board[BOARD_ROWS][BOARD_COLS];
     Shape shape;
+    int shapes[6][4][4];
 } GameState;
 
 GameState state;
+
 
 int getTetrisRow()
 {
@@ -47,7 +50,7 @@ int getTetrisRow()
         int colCount = 0;
         for (int j = 0; j < BOARD_COLS; j++)
         {
-            if(state.board[i][j] == 1)
+            if (state.board[i][j] == 1)
             {
                 colCount++;
             }
@@ -62,6 +65,19 @@ int getTetrisRow()
     return 0;
 }
 
+void selectRandomShape()
+{
+    int x = random(0, 5);
+
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            state.shape.body[i][j] = state.shapes[x][i][j];
+        }
+    }
+}
+
 void collapseRow(int index)
 {
     for (int i = index; i > 0; i--)
@@ -71,39 +87,79 @@ void collapseRow(int index)
             state.board[i][j] = state.board[i - 1][j];
         }
     }
+
+    state.tick_rate -=50;
 }
 
-int getNextRotationIndex()
+int getShapeSize()
 {
-    if (state.shape.rotationIndex != state.shape.rotationCount - 1)
+    for (int i = 0; i < 4; i++)
     {
-        return state.shape.rotationIndex + 1;
+        if(state.shape.body[i][3] == 1 || state.shape.body[3][i] == 1)
+        {
+            return 4;
+        }
     }
 
-    return 0;
+
+    return 3;
+}
+
+void getNextRotation(int shape[4][4])
+{
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+           shape[i][j] = state.shape.body[i][j];
+        }
+    }
+
+    int size = getShapeSize();
+
+    transpose(shape, size);
+    reverseRows(shape, size);
 }
 
 void rotate()
 {
-    // state.shape.rotationIndex = getNextRotationIndex();
+    int size = getShapeSize();
 
-    transpose(state.shape.rotation[0]);
-    reverseRows(state.shape.rotation[0]);
+    transpose(state.shape.body, size);
+    reverseRows(state.shape.body, size);
 }
 
-bool checkCollision(int dx, int dy, int rotationIndex)
+bool checkCollision(int dx, int dy, bool checkNextRotation)
 {
+    int shape[4][4];
+
+    getNextRotation(shape);
+
     for (int row = 0; row < 4; row++)
     {
         for (int col = 0; col < 4; col++)
         {
-            if (state.shape.rotation[rotationIndex][row][col] == 1)
+            if(checkNextRotation)
             {
-                int x = col + state.shape.x + dx;
-                int y = row + state.shape.y + dy;
-                if (y >= BOARD_ROWS || y <= 0 || x >= BOARD_COLS || x < 0)
+                if (shape[row][col] == 1)
                 {
-                    return true;
+                    int x = col + state.shape.x + dx;
+                    int y = row + state.shape.y + dy;
+                    if (y >= BOARD_ROWS || y <= 0 || x >= BOARD_COLS || x < 0)
+                    {
+                        return true;
+                    }
+                }
+            } else
+            {
+                if (state.shape.body[row][col] == 1)
+                {
+                    int x = col + state.shape.x + dx;
+                    int y = row + state.shape.y + dy;
+                    if (y >= BOARD_ROWS || y <= 0 || x >= BOARD_COLS || x < 0)
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -118,7 +174,7 @@ bool checkGroundedCollision(int dx, int dy)
     {
         for (int col = 0; col < 4; col++)
         {
-            if (state.shape.rotation[state.shape.rotationIndex][row][col] == 1)
+            if (state.shape.body[row][col] == 1)
             {
                 int x = col + state.shape.x;
                 int y = row + state.shape.y;
@@ -138,9 +194,10 @@ bool checkGroundedCollision(int dx, int dy)
 
 void newShape()
 {
-    state.shape.x = 0;
+    state.shape.x = 4;
     state.shape.y = 0;
-    state.shape.rotationIndex = 0;
+
+    selectRandomShape();
 }
 
 void applyShapeToBoard()
@@ -149,7 +206,7 @@ void applyShapeToBoard()
     {
         for (int col = 0; col < 4; col++)
         {
-            if (state.shape.rotation[state.shape.rotationIndex][row][col] == 1)
+            if (state.shape.body[row][col] == 1)
             {
                 int x = col + state.shape.x;
                 int y = row + state.shape.y;
@@ -160,12 +217,28 @@ void applyShapeToBoard()
     }
 }
 
+bool isGameover()
+{
+    return state.shape.y <= 4 && checkGroundedCollision(0, 1);
+
+}
+
 
 void updateGame()
 {
     if (!state.started)
     {
         return;
+    }
+
+    if(state.gameover)
+    {
+        return;
+    }
+
+    if(isGameover())
+    {
+        state.gameover = true;
     }
 
     if (!checkCollision(0, 1, state.shape.rotationIndex))
@@ -182,7 +255,7 @@ void updateGame()
 
     int row = getTetrisRow();
 
-    if(row != 0)
+    if (row != 0)
     {
         collapseRow(row);
     }
@@ -240,7 +313,7 @@ void renderShape()
     {
         for (int col = 0; col < 4; col++)
         {
-            if (state.shape.rotation[state.shape.rotationIndex][row][col] == 1)
+            if (state.shape.body[row][col] == 1)
             {
                 int startX = BOARD_START_X + PX_PER_WIDTH * (col + state.shape.x);
                 int startY = BOARD_START_Y + PX_PER_HEIGHT * (row + state.shape.y);
@@ -260,6 +333,14 @@ void render()
 {
     // This function is called to render graphics
     glClear(GL_COLOR_BUFFER_BIT);
+
+    renderBitmapString(10, 50, GLUT_BITMAP_HELVETICA_12, "SPACE to start");
+    renderBitmapString(10, 70, GLUT_BITMAP_HELVETICA_12, "R to restart");
+
+    if(state.gameover)
+    {
+        renderBitmapString(500, 50, GLUT_BITMAP_HELVETICA_18, "GAME OVER");
+    }
 
     renderWalls();
     renderBoard();
@@ -307,96 +388,67 @@ void initGameState()
         }
     }
 
-    state.board[19][0] = 1;
-    state.board[19][1] = 1;
-    state.board[19][2] = 1;
-    state.board[19][3] = 1;
-    state.board[19][4] = 1;
-    state.board[19][5] = 1;
-    state.board[19][6] = 1;
-    state.board[19][7] = 1;
-    state.board[19][8] = 1;
-    state.board[19][9] = 1;
-    state.board[18][1] = 1;
-
-    state.board[18][0] = 1;
-    state.board[18][1] = 1;
-    state.board[18][2] = 1;
-    state.board[18][3] = 1;
-    state.board[18][4] = 1;
-    state.board[18][5] = 1;
-    state.board[18][6] = 1;
-    state.board[18][7] = 1;
-    state.board[18][8] = 1;
-    state.board[18][9] = 1;
-    state.board[18][1] = 1;
-
-    state.board[18][5] = 1;
-    state.board[17][0] = 1;
-
     state.tick_rate = 1000 / TICK_RATE;
 
-    // int iRotations[2][4][4] = {
-    //     {
-    //         {0, 0, 0, 0,},
-    //         {0, 0, 0, 0,},
-    //         {1, 1, 1, 1,},
-    //         {0, 0, 0, 0,}
-    //     },
-    //     {
-    //         {0, 0, 1, 0,},
-    //         {0, 0, 1, 0,},
-    //         {0, 0, 1, 0,},
-    //         {0, 0, 1, 0,}
-    //     },
-    // };
-
-    int iRotations[4][4][4] = {
+    int shapes[6][4][4] = {
         {
-            {0, 0, 0, 0,},
             {1, 1, 1, 0,},
             {0, 0, 1, 0,},
-            {0, 0, 0, 0,}
-        },
-        {
-            {0, 1, 0, 0,},
-            {0, 1, 0, 0,},
-            {1, 1, 0, 0,},
-            {0, 0, 0, 0,}
-        },
-
-        {
-            {1, 0, 0, 0,},
-            {1, 1, 1, 0,},
             {0, 0, 0, 0,},
             {0, 0, 0, 0,}
         },
         {
+            {0, 0, 0, 0,},
+            {0, 0, 0, 0,},
+            {1, 1, 1, 1},
+            {0, 0, 0, 0,}
+        },
+        {
+            {0, 0, 0, 0,},
+            {1, 1, 1, 0,},
+            {1, 0, 0, 0,},
+            {0, 0, 0, 0,}
+        },
+        {
+            {0, 0, 0, 0,},
             {0, 1, 1, 0,},
-            {0, 1, 0, 0,},
+            {1, 1, 0, 0,},
+            {0, 0 ,0, 0,}
+        },
+        {
+            {0, 0, 0, 0,},
+            {1, 1, 1, 0,},
             {0, 1, 0, 0,},
             {0, 0, 0, 0,}
-        }
-
-
+        },
+        {
+            {0, 0, 0, 0,},
+            {1, 1, 0, 0,},
+            {0, 1, 1, 0,},
+            {0, 0, 0, 0,}
+        },
     };
 
-    state.shape.rotationCount = 4;
-    state.shape.rotationIndex = 0;
-    state.shape.x = 0;
-    state.shape.y = 0;
-    state.shape.rotation = (int (*)[4][4])malloc(sizeof(int) * 4 * 4 * 4);
 
-    for (int r = 0; r < 4; r++)
+    for (int i = 0; i < 6; i++)
     {
-        for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
         {
-            for (int j = 0; j < 4; j++)
+            for (int k = 0; k < 4; k++)
             {
-                state.shape.rotation[r][i][j] = iRotations[r][i][j];
+                state.shapes[i][j][k] = shapes[i][j][k];
             }
         }
     }
+
+    selectRandomShape();
+
+    state.gameover = false;
+    state.shape.x = 4;
+    state.shape.y = 0;
+    state.shape.rotation = (int (*)[4][4])malloc(sizeof(int) * 4 * 4 * 4);
+
+
 }
 
 void restart()
@@ -424,14 +476,24 @@ void keyboard(unsigned char key, int x, int y)
     switch (key)
     {
     case 'w': // Move up
-        if (checkCollision(0, 0, getNextRotationIndex()))
+        if(!state.started || state.gameover)
+        {
+            return;
+        }
+
+        if (checkCollision(0, 0, true))
         {
             return;
         }
         rotate();
         break;
     case 's': // Move down
-        if (checkCollision(0, 1, state.shape.rotationIndex))
+        if(!state.started || state.gameover)
+        {
+            return;
+        }
+
+        if (checkCollision(0, 1, false))
         {
             return;
         }
@@ -446,7 +508,12 @@ void keyboard(unsigned char key, int x, int y)
         state.shape.y++;
         break;
     case 'a': // Move left
-        if (checkCollision(-1, 0, state.shape.rotationIndex))
+        if(!state.started || state.gameover)
+        {
+            return;
+        }
+
+        if (checkCollision(-1, 0, false))
         {
             return;
         }
@@ -461,7 +528,12 @@ void keyboard(unsigned char key, int x, int y)
         state.shape.x--;
         break;
     case 'd': // Move right
-        if (checkCollision(1, 0, state.shape.rotationIndex))
+        if(!state.started || state.gameover)
+        {
+            return;
+        }
+
+        if (checkCollision(1, 0, false))
         {
             return;
         }
